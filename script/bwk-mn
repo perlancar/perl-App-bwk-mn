@@ -9,24 +9,33 @@ use warnings;
 use Log::ger;
 
 use Perinci::CmdLine::Any;
+use Perinci::CmdLineX::CommonOptions::SelfUpgrade;
 
-my $prefix = "/App/bwk/";
+my $prefix = "/App/bwk/mn/";
 
-Perinci::CmdLine::Any->new(
+my $cli = Perinci::CmdLine::Any->new(
     url => $prefix,
     log => 1,
     pass_cmdline_object => 1,
     subcommands => {
         'status'    => { url => "${prefix}status", },
     },
-)->run;
+);
+Perinci::CmdLineX::CommonOptions::SelfUpgrade->apply_to_object($cli);
+$cli->run;
 
 # ABSTRACT: Some commands to manage Bulwark masternode
 # PODNAME:
 
 =head1 SYNOPSIS
 
+To see masternode status:
+
  % bwk-mn status
+
+To upgrade to the latest version:
+
+ % bwk-mn -U
 
 
 =head1 DESCRIPTION

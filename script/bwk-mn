@@ -1,0 +1,41 @@
+#!perl
+
+# DATE
+# VERSION
+
+use 5.010001;
+use strict;
+use warnings;
+use Log::ger;
+
+use Perinci::CmdLine::Any;
+
+my $prefix = "/App/bwk/";
+
+Perinci::CmdLine::Any->new(
+    url => $prefix,
+    log => 1,
+    pass_cmdline_object => 1,
+    subcommands => {
+        'status'    => { url => "${prefix}status", },
+    },
+)->run;
+
+# ABSTRACT: Some commands to manage Bulwark masternode
+# PODNAME:
+
+=head1 SYNOPSIS
+
+ % bwk-mn status
+
+
+=head1 DESCRIPTION
+
+Early release. More functionality will be added in the future.
+
+
+=head1 SEE ALSO
+
+L<cryp-mn>
+
+Other C<cryp-*> in the L<App::cryp> family.

@@ -19,6 +19,7 @@ my $cli = Perinci::CmdLine::Any->new(
     pass_cmdline_object => 1,
     subcommands => {
         'status'    => { url => "${prefix}status", },
+        'restore-from-zfs-snapshot' => { url => "${prefix}restore_from_zfs_snapshot", },
     },
 );
 Perinci::CmdLineX::CommonOptions::SelfUpgrade->apply_to_object($cli);
@@ -29,13 +30,17 @@ $cli->run;
 
 =head1 SYNOPSIS
 
+To upgrade to the latest version:
+
+ % bwk-mn -U
+
 To see masternode status:
 
  % bwk-mn status
 
-To upgrade to the latest version:
+To restore from a ZFS snapshot:
 
- % bwk-mn -U
+ % bwk-mn restore-from-zfs-snapshot
 
 
 =head1 DESCRIPTION

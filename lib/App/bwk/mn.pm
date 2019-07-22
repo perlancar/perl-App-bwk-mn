@@ -40,7 +40,7 @@ sub status {
     [200];
 }
 
-sub _zfs_list_snapshots {
+sub __zfs_list_snapshots {
     my %res;
     for (`zfs list -t snapshot -H`) {
         chomp;
@@ -58,6 +58,34 @@ sub _zfs_list_snapshots {
         };
     }
     \%res;
+}
+
+sub _newest_bulwark_zfs_snapshots {
+    my $picked_snapshot;
+    my $snapshot_date;
+    my $picked_s;
+    my $snapshots = __zfs_list_snapshots();
+    for my $full_name (keys %$snapshots) {
+        unless ($full_name =~ /bwk|bulwark/i) {
+            log_trace "Snapshot '$full_name' does not have bwk|bulwark in its name, skipped";
+            next;
+        }
+        my $s = $snapshots->{$full_name};
+        unless ($s->{snapshot_name} =~ /\A(\d{4})-(\d{2})-(\d{2})/) {
+            log_trace "Snapshot '$full_name' is not named using YYYY-MM-DD format, skipped";
+            next;
+        }
+        if (!$picked_snapshot || $snapshot_date lt $s->{snapshot_name}) {
+            $s->{date} = "$1-$2-$3";
+            $picked_s = $s;
+            $picked_snapshot = $full_name;
+            $snapshot_date = $s->{snapshot_name};
+        }
+    }
+    unless ($picked_snapshot) {
+        return [412, "Cannot find any suitable ZFS snapshot"];
+    }
+    [200, "OK", $picked_snapshot, {"func.all_snapshots"=>$snapshots, "func.raw"=>$picked_s}];
 }
 
 $SPEC{restore_from_zfs_snapshot} = {
@@ -106,33 +134,72 @@ _
 sub restore_from_zfs_snapshot {
     my %args = @_;
 
-    my $picked_snapshot;
-    my $snapshot_date;
-  PICK_SNAPSHOT: {
-        my $snapshots = _zfs_list_snapshots();
-        for my $full_name (keys %$snapshots) {
-            unless ($full_name =~ /bwk|bulwark/i) {
-                log_trace "Snapshot '$full_name' does not have bwk|bulwark in its name, skipped";
-                next;
-            }
-            my $s = $snapshots->{$full_name};
-            unless ($s->{snapshot_name} =~ /\A(\d{4})-(\d{2})-(\d{2})/) {
-                log_trace "Snapshot '$full_name' is not named using YYYY-MM-DD format, skipped";
-                next;
-            }
-            if (!$picked_snapshot || $snapshot_date lt $s->{snapshot_name}) {
-                $picked_snapshot = $full_name;
-                $snapshot_date = $s->{snapshot_name};
-            }
-        }
-        unless ($picked_snapshot) {
-            return [412, "Cannot find any suitable ZFS snapshot"];
-        }
+    my $res = _newest_bulwark_zfs_snapshots();
+    return $res unless $res->[0] == 200;
+
+    my $newest;
+
+    system({log=>1, die=>1}, "systemctl", "stop", "bulwarkd");
+
+    system({log=>1, die=>1}, "zfs", "rollback", $res->[2]);
+
+    system({log=>1, die=>1}, "systemctl", "start", "bulwarkd");
+
+    # TODO: wait until fully sync-ed
+
+    [200];
+}
+
+$SPEC{new_zfs_snapshot} = {
+    v => 1.1,
+    summary => 'Create a new ZFS snapshot',
+    description => <<'_',
+
+This subcommand will:
+
+1. stop bulwarkd
+2. create a new ZFS snapshot
+3. restart bulwarkd again
+
+See `restore_from_zfs_snapshot` for more details.
+
+_
+    args => {
+    },
+    deps => {
+        all => [
+            {prog => 'systemctl'},
+            {prog => 'bulwark-cli'},
+            {prog => 'zfs'},
+        ],
+    },
+};
+sub new_zfs_snapshot {
+    require DateTime;
+
+    my %args = @_;
+
+    my $res = _newest_bulwark_zfs_snapshots();
+    return $res unless $res->[0] == 200;
+    my $snapshots = $res->[3]{'func.all_snapshots'};
+    my $s = $res->[3]{'func.raw'};
+
+    my $today = DateTime->now->ymd;
+    my $new_snapshot;
+    my $i = 0;
+    while (1) {
+        $new_snapshot = sprintf(
+            "%s/%s\@%s%s",
+            $s->{pool}, $s->{fs},
+            $today,
+            $i++ ? sprintf("_%03d", $i) : "",
+        );
+        last unless $snapshots->{$new_snapshot};
     }
 
     system({log=>1, die=>1}, "systemctl", "stop", "bulwarkd");
 
-    system({log=>1, die=>1}, "zfs", "rollback", $picked_snapshot);
+    system({log=>1, die=>1}, "zfs", "snapshot", $new_snapshot);
 
     system({log=>1, die=>1}, "systemctl", "start", "bulwarkd");
 

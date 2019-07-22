@@ -20,6 +20,7 @@ my $cli = Perinci::CmdLine::Any->new(
     subcommands => {
         'status'    => { url => "${prefix}status", },
         'restore-from-zfs-snapshot' => { url => "${prefix}restore_from_zfs_snapshot", },
+        'new-zfs-snapshot'          => { url => "${prefix}new_zfs_snapshot", },
     },
 );
 Perinci::CmdLineX::CommonOptions::SelfUpgrade->apply_to_object($cli);
@@ -41,6 +42,10 @@ To see masternode status:
 To restore from a ZFS snapshot:
 
  % bwk-mn restore-from-zfs-snapshot
+
+To create a new ZFS snapshot:
+
+ % bwk-mn new-zfs-snapshot
 
 
 =head1 DESCRIPTION
